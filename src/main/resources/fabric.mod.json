@@ -3,7 +3,7 @@
 	"id": "anti-vacuum",
 	"version": "${version}",
 	"name": "Anti-Vacuum",
-	"description": "A Minecraft Fabric mod that forces loading of pseudo-vacuum blocks to eliminate visual artifacts. Use /forceloadchunk to process all blocks in your current chunk.",
+	"description": "A client-side Minecraft Fabric mod that forces loading of pseudo-vacuum blocks to eliminate visual artifacts. Press F8 to process all blocks in your current chunk and trigger server chunk loading requests.",
 	"authors": [
 		"ObservedObserver"
 	],
@@ -13,7 +13,7 @@
 	},
 	"license": "CC0-1.0",
 	"icon": "assets/anti-vacuum/icon.png",
-	"environment": "*",
+	"environment": "client",
 	"entrypoints": {
 		"main": [
 			"com.example.ExampleMod"

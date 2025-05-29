@@ -14,14 +14,12 @@ public class ExampleMod implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
-		// This code runs as soon as Minecraft is in a mod-load-ready state.
-		// However, some things (like resources) may still be uninitialized.
-		// Proceed with mild caution.
-
-		LOGGER.info("=== ANTI-VACUUM MOD (SERVER-SIDE) STARTING INITIALIZATION ===");
+		// This mod is primarily client-side, but we still need this entrypoint
+		// for the mod to be recognized properly by Fabric
+		LOGGER.info("=== ANTI-VACUUM MOD INITIALIZATION ===");
 		LOGGER.info("Anti-Vacuum mod initialized!");
 		LOGGER.info("Mod ID: {}", MOD_ID);
-		LOGGER.info("Client-side functionality is handled by ExampleModClient");
-		LOGGER.info("=== ANTI-VACUUM MOD (SERVER-SIDE) INITIALIZATION COMPLETE ===");
+		LOGGER.info("This is a client-side mod - main functionality is in ExampleModClient");
+		LOGGER.info("=== ANTI-VACUUM MOD INITIALIZATION COMPLETE ===");
 	}
 }

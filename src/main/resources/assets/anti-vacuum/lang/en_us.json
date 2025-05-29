@@ -1,4 +1,5 @@
 {
   "key.anti-vacuum.forceload": "Force Load Chunk",
+  "key.anti-vacuum.aggressive": "Aggressive Force Load",
   "category.anti-vacuum": "Anti-Vacuum"
 } 
