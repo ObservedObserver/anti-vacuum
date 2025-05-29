@@ -13,6 +13,9 @@ import net.minecraft.text.Text;
 import net.minecraft.world.chunk.WorldChunk;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.world.chunk.ChunkSection;
 import net.minecraft.client.render.WorldRenderer;
@@ -25,7 +28,20 @@ public class ExampleModClient implements ClientModInitializer {
 	private static final Logger LOGGER = LoggerFactory.getLogger("anti-vacuum");
 	
 	private static KeyBinding forceLoadKeyBinding;
-	private static KeyBinding aggressiveLoadKeyBinding;
+        private static KeyBinding aggressiveLoadKeyBinding;
+
+        private void simulateBlockClick(MinecraftClient client, BlockPos pos) {
+                if (client.interactionManager == null || client.player == null) {
+                        return;
+                }
+
+                BlockHitResult hitResult = new BlockHitResult(Vec3d.ofCenter(pos), Direction.UP, pos, false);
+                try {
+                        client.interactionManager.interactBlock(client.player, Hand.MAIN_HAND, hitResult);
+                } catch (Exception e) {
+                        LOGGER.debug("Failed to simulate block click at {}: {}", pos, e.getMessage());
+                }
+        }
 	
 	@Override
 	public void onInitializeClient() {
@@ -80,8 +96,8 @@ public class ExampleModClient implements ClientModInitializer {
 		
 		try {
 			int processedBlocks = aggressive ? 
-				aggressiveForceLoadChunkBlocks(client, chunkPos) : 
-				forceLoadChunkBlocks(client.world, chunkPos);
+                               aggressiveForceLoadChunkBlocks(client, chunkPos) :
+                               forceLoadChunkBlocks(client, chunkPos);
 			
 			client.player.sendMessage(Text.literal("§6[Anti-Vacuum] " + modeText + " §aCompleted! §7Processed " + processedBlocks + " blocks in chunk " + chunkPos.x + ", " + chunkPos.z), false);
 			LOGGER.info("Successfully processed {} blocks in chunk {}, {} ({})", processedBlocks, chunkPos.x, chunkPos.z, mode);
@@ -91,8 +107,9 @@ public class ExampleModClient implements ClientModInitializer {
 		}
 	}
 	
-	private int forceLoadChunkBlocks(ClientWorld world, ChunkPos chunkPos) {
-		int processedBlocks = 0;
+       private int forceLoadChunkBlocks(MinecraftClient client, ChunkPos chunkPos) {
+               ClientWorld world = client.world;
+               int processedBlocks = 0;
 		
 		// Request chunk loading from the server by accessing chunk data
 		WorldChunk chunk = world.getChunk(chunkPos.x, chunkPos.z);
@@ -122,14 +139,13 @@ public class ExampleModClient implements ClientModInitializer {
 						// the block data from the server if it's not loaded
 						BlockState blockState = world.getBlockState(pos);
 						
-						// Check if this was a "vacuum" block (air that should be something else)
-						if (blockState.getBlock() == Blocks.AIR) {
-							// Force a block update by accessing additional properties
-							world.getBlockEntity(pos); // This can trigger server requests
-							processedBlocks++;
-						} else if (!blockState.getBlock().equals(Blocks.VOID_AIR)) {
-							// Count non-void blocks as processed
-							processedBlocks++;
+                                               // Check if this was a "vacuum" block (air that should be something else)
+                                               if (blockState.getBlock() == Blocks.AIR) {
+                                                       world.getBlockEntity(pos); // Trigger potential update
+                                                       simulateBlockClick(client, pos);
+                                                       processedBlocks++;
+                                               } else if (!blockState.getBlock().equals(Blocks.VOID_AIR)) {
+                                                       processedBlocks++;
 						}
 						
 						// Also force chunk section loading
@@ -230,8 +246,9 @@ public class ExampleModClient implements ClientModInitializer {
 		return processedBlocks;
 	}
 	
-	private int standardBlockAccess(ClientWorld world, WorldChunk chunk, int startX, int startZ, int endX, int endZ, int minY, int maxY) {
-		int processed = 0;
+       private int standardBlockAccess(ClientWorld world, WorldChunk chunk, int startX, int startZ, int endX, int endZ, int minY, int maxY) {
+               int processed = 0;
+               MinecraftClient client = MinecraftClient.getInstance();
 		
 		// Access blocks in a pattern that's harder for optimization mods to predict
 		for (int y = minY; y < maxY; y += 4) { // Skip some Y levels first
@@ -239,9 +256,12 @@ public class ExampleModClient implements ClientModInitializer {
 				for (int z = startZ; z <= endZ; z += 2) { // Skip some Z positions
 					BlockPos pos = new BlockPos(x, y, z);
 					try {
-						BlockState state = world.getBlockState(pos);
-						world.getBlockEntity(pos);
-						processed++;
+                                               BlockState state = world.getBlockState(pos);
+                                               world.getBlockEntity(pos);
+                                               if (state.getBlock() == Blocks.AIR) {
+                                                       simulateBlockClick(client, pos);
+                                               }
+                                               processed++;
 					} catch (Exception e) {
 						LOGGER.debug("Error in standard access at {}: {}", pos, e.getMessage());
 					}
@@ -255,8 +275,11 @@ public class ExampleModClient implements ClientModInitializer {
 				for (int z = startZ; z <= endZ; z++) {
 					BlockPos pos = new BlockPos(x, y, z);
 					try {
-						world.getBlockState(pos);
-						processed++;
+                                               BlockState state = world.getBlockState(pos);
+                                               if (state.getBlock() == Blocks.AIR) {
+                                                       simulateBlockClick(client, pos);
+                                               }
+                                               processed++;
 					} catch (Exception e) {
 						LOGGER.debug("Error in gap filling at {}: {}", pos, e.getMessage());
 					}
@@ -289,8 +312,9 @@ public class ExampleModClient implements ClientModInitializer {
 		return processed;
 	}
 	
-	private int neighborAwareAccess(ClientWorld world, int startX, int startZ, int endX, int endZ, int minY, int maxY) {
-		int processed = 0;
+       private int neighborAwareAccess(ClientWorld world, int startX, int startZ, int endX, int endZ, int minY, int maxY) {
+               int processed = 0;
+               MinecraftClient client = MinecraftClient.getInstance();
 		
 		// Access blocks while also checking their neighbors (counters visibility-based culling)
 		for (int y = minY; y < maxY; y += 8) { // Sample every 8th Y level
@@ -299,12 +323,15 @@ public class ExampleModClient implements ClientModInitializer {
 					BlockPos pos = new BlockPos(x, y, z);
 					try {
 						// Access the block and all its neighbors
-						world.getBlockState(pos);
-						for (Direction dir : Direction.values()) {
-							BlockPos neighborPos = pos.offset(dir);
-							world.getBlockState(neighborPos);
-						}
-						processed += 7; // 1 + 6 neighbors
+                                               BlockState state = world.getBlockState(pos);
+                                               for (Direction dir : Direction.values()) {
+                                                       BlockPos neighborPos = pos.offset(dir);
+                                                       world.getBlockState(neighborPos);
+                                               }
+                                               if (state.getBlock() == Blocks.AIR) {
+                                                       simulateBlockClick(client, pos);
+                                               }
+                                               processed += 7; // 1 + 6 neighbors
 					} catch (Exception e) {
 						LOGGER.debug("Error in neighbor access at {}: {}", pos, e.getMessage());
 					}
